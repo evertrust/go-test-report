@@ -36,6 +36,8 @@ class SelectedItems {}
  * @property {TestResults} data
  * @property {HTMLElement} testResultsElem
  * @property {HTMLElement} testGroupListElem
+ * @property {HTMLInputElement} [searchInputElem]
+ * @property {HTMLElement} [searchMetaElem]
  */
 class GoTestReportElements {}
 
@@ -171,6 +173,74 @@ window.GoTestReport = function (elements) {
           testOutputDiv.remove()
         }
       }
+    },
+
+    /**
+     * Filters tests by name (or package) across all groups and renders matches
+     * in the same test group list element so that the existing click-to-expand
+     * behavior on rows keeps working.
+     * @param {string} rawQuery
+     * @param {TestResults} data
+     * @param {SelectedItems} selectedItems
+     */
+    searchHandler: function (rawQuery, data, selectedItems) {
+      const query = (rawQuery || '').trim().toLowerCase()
+      const testGroupListElem = elements.testGroupListElem
+
+      if (query === '') {
+        testGroupListElem.innerHTML = ''
+        if (elements.searchMetaElem) {
+          elements.searchMetaElem.textContent = ''
+        }
+        return
+      }
+
+      // Clear any highlighted test group indicator since we're showing a
+      // cross-group list of matches instead of a single group's tests.
+      if (selectedItems.testResults != null) {
+        const testResultsElement = /**@type {HTMLElement}*/ selectedItems.testResults
+        testResultsElement.classList.remove('selected')
+        testResultsElement.style.backgroundColor = selectedItems.selectedTestGroupColor
+        selectedItems.testResults = null
+        selectedItems.selectedTestGroupColor = null
+      }
+
+      let html = ''
+      let matches = 0
+      for (let g = 0; g < data.length; g++) {
+        const group = data[g]
+        if (!group || !group.TestResults) {
+          continue
+        }
+        for (let i = 0; i < group.TestResults.length; i++) {
+          const testResult = /**@type {TestStatus}*/ group.TestResults[i]
+          const name = (testResult.TestName || '').toLowerCase()
+          const pkg = (testResult.Package || '').toLowerCase()
+          if (name.indexOf(query) === -1 && pkg.indexOf(query) === -1) {
+            continue
+          }
+          const testPassed = /**@type {boolean}*/ testResult.Passed
+          const testSkipped = /**@type {boolean}*/ testResult.Skipped
+          const testPassedStatus = /**@type {string}*/ (testPassed) ? '' : (testSkipped ? 'skipped' : 'failed')
+          html += `<div class="testGroupRow ${testPassedStatus}" data-groupid="${g}" data-index="${i}">
+        <span class="testStatus ${testPassedStatus}">${(testPassed) ? '&check' : (testSkipped ? '&dash' : '&cross')};</span>
+        <span class="testTitle">${testResult.TestName}</span>
+        <span class="testDuration"><span>${testResult.ElapsedTime}s </span>⏱</span>
+      </div>`
+          matches++
+        }
+      }
+
+      if (matches === 0) {
+        html = `<div class="testGroupRow noResults">No tests match &laquo;${rawQuery}&raquo;.</div>`
+      }
+      testGroupListElem.innerHTML = html
+
+      if (elements.searchMetaElem) {
+        elements.searchMetaElem.textContent = matches === 0
+          ? '0 matches'
+          : `${matches} match${matches === 1 ? '' : 'es'}`
+      }
     }
   }
 
@@ -189,6 +259,14 @@ window.GoTestReport = function (elements) {
           .addEventListener('click', event =>
             goTestReport.testGroupListHandler(/**@type {Element}*/ event.target,
                                               elements.data))
+
+  if (elements.searchInputElem) {
+    elements.searchInputElem
+            .addEventListener('input', event =>
+              goTestReport.searchHandler(/**@type {HTMLInputElement}*/ (event.target).value,
+                                         elements.data,
+                                         selectedItems))
+  }
 
   return goTestReport
 }
