@@ -1,4 +1,4 @@
-module github.com/vakenbolt/go-test-report
+module github.com/evertrust/go-test-report
 
 go 1.13
 
