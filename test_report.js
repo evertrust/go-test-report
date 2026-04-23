@@ -38,6 +38,8 @@ class SelectedItems {}
  * @property {HTMLElement} testGroupListElem
  * @property {HTMLInputElement} [searchInputElem]
  * @property {HTMLElement} [searchMetaElem]
+ * @property {HTMLElement} [statusFilterElem]
+ * @property {HTMLDataListElement} [suggestionsElem]
  */
 class GoTestReportElements {}
 
@@ -176,18 +178,23 @@ window.GoTestReport = function (elements) {
     },
 
     /**
-     * Filters tests by name (or package) across all groups and renders matches
-     * in the same test group list element so that the existing click-to-expand
-     * behavior on rows keeps working.
-     * @param {string} rawQuery
+     * Filters tests by name/package and by status across all groups, and
+     * renders matches into the test group list element so that the existing
+     * click-to-expand behavior on rows keeps working.
      * @param {TestResults} data
      * @param {SelectedItems} selectedItems
      */
-    searchHandler: function (rawQuery, data, selectedItems) {
+    applyFilter: function (data, selectedItems) {
+      const rawQuery = elements.searchInputElem ? elements.searchInputElem.value : ''
       const query = (rawQuery || '').trim().toLowerCase()
+      const statusFilter = (function () {
+        if (!elements.statusFilterElem) return 'all'
+        const active = elements.statusFilterElem.querySelector('.statusChip.active')
+        return active ? active.getAttribute('data-status') : 'all'
+      })()
       const testGroupListElem = elements.testGroupListElem
 
-      if (query === '') {
+      if (query === '' && statusFilter === 'all') {
         testGroupListElem.innerHTML = ''
         if (elements.searchMetaElem) {
           elements.searchMetaElem.textContent = ''
@@ -214,13 +221,19 @@ window.GoTestReport = function (elements) {
         }
         for (let i = 0; i < group.TestResults.length; i++) {
           const testResult = /**@type {TestStatus}*/ group.TestResults[i]
-          const name = (testResult.TestName || '').toLowerCase()
-          const pkg = (testResult.Package || '').toLowerCase()
-          if (name.indexOf(query) === -1 && pkg.indexOf(query) === -1) {
-            continue
-          }
           const testPassed = /**@type {boolean}*/ testResult.Passed
           const testSkipped = /**@type {boolean}*/ testResult.Skipped
+          const status = testPassed ? 'passed' : (testSkipped ? 'skipped' : 'failed')
+          if (statusFilter !== 'all' && status !== statusFilter) {
+            continue
+          }
+          if (query !== '') {
+            const name = (testResult.TestName || '').toLowerCase()
+            const pkg = (testResult.Package || '').toLowerCase()
+            if (name.indexOf(query) === -1 && pkg.indexOf(query) === -1) {
+              continue
+            }
+          }
           const testPassedStatus = /**@type {string}*/ (testPassed) ? '' : (testSkipped ? 'skipped' : 'failed')
           html += `<div class="testGroupRow ${testPassedStatus}" data-groupid="${g}" data-index="${i}">
         <span class="testStatus ${testPassedStatus}">${(testPassed) ? '&check' : (testSkipped ? '&dash' : '&cross')};</span>
@@ -232,7 +245,10 @@ window.GoTestReport = function (elements) {
       }
 
       if (matches === 0) {
-        html = `<div class="testGroupRow noResults">No tests match &laquo;${rawQuery}&raquo;.</div>`
+        const label = query !== ''
+          ? `No tests match &laquo;${rawQuery}&raquo;${statusFilter !== 'all' ? ` (status: ${statusFilter})` : ''}.`
+          : `No ${statusFilter} tests.`
+        html = `<div class="testGroupRow noResults">${label}</div>`
       }
       testGroupListElem.innerHTML = html
 
@@ -262,10 +278,60 @@ window.GoTestReport = function (elements) {
 
   if (elements.searchInputElem) {
     elements.searchInputElem
-            .addEventListener('input', event =>
-              goTestReport.searchHandler(/**@type {HTMLInputElement}*/ (event.target).value,
-                                         elements.data,
-                                         selectedItems))
+            .addEventListener('input', () =>
+              goTestReport.applyFilter(elements.data, selectedItems))
+  }
+
+  if (elements.statusFilterElem) {
+    elements.statusFilterElem
+            .addEventListener('click', event => {
+              const target = /**@type {HTMLElement}*/ event.target
+              if (!target || !target.classList || !target.classList.contains('statusChip')) {
+                return
+              }
+              const chips = elements.statusFilterElem.querySelectorAll('.statusChip')
+              chips.forEach(chip => chip.classList.remove('active'))
+              target.classList.add('active')
+              goTestReport.applyFilter(elements.data, selectedItems)
+            })
+  }
+
+  // Populate the <datalist> used by the search input with unique test names
+  // and packages so the browser surfaces native autocomplete suggestions.
+  if (elements.suggestionsElem) {
+    const suggestions = new Set()
+    for (let g = 0; g < elements.data.length; g++) {
+      const group = elements.data[g]
+      if (!group || !group.TestResults) continue
+      for (let i = 0; i < group.TestResults.length; i++) {
+        const t = group.TestResults[i]
+        if (t.TestName) suggestions.add(t.TestName)
+        if (t.Package) suggestions.add(t.Package)
+      }
+    }
+    const frag = document.createDocumentFragment()
+    Array.from(suggestions).sort().forEach(value => {
+      const option = document.createElement('option')
+      option.value = value
+      frag.appendChild(option)
+    })
+    elements.suggestionsElem.innerHTML = ''
+    elements.suggestionsElem.appendChild(frag)
+  }
+
+
+  if (elements.statusFilterElem) {
+    const hasFailed = elements.data.some(group =>
+      group && group.TestResults && group.TestResults.some(t => !t.Passed && !t.Skipped))
+    if (hasFailed) {
+      const failedChip = elements.statusFilterElem.querySelector('.statusChip[data-status="failed"]')
+      const allChip = elements.statusFilterElem.querySelector('.statusChip[data-status="all"]')
+      if (failedChip && allChip) {
+        allChip.classList.remove('active')
+        failedChip.classList.add('active')
+        goTestReport.applyFilter(elements.data, selectedItems)
+      }
+    }
   }
 
   return goTestReport
