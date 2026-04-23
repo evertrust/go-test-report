@@ -319,5 +319,20 @@ window.GoTestReport = function (elements) {
     elements.suggestionsElem.appendChild(frag)
   }
 
+
+  if (elements.statusFilterElem) {
+    const hasFailed = elements.data.some(group =>
+      group && group.TestResults && group.TestResults.some(t => !t.Passed && !t.Skipped))
+    if (hasFailed) {
+      const failedChip = elements.statusFilterElem.querySelector('.statusChip[data-status="failed"]')
+      const allChip = elements.statusFilterElem.querySelector('.statusChip[data-status="all"]')
+      if (failedChip && allChip) {
+        allChip.classList.remove('active')
+        failedChip.classList.add('active')
+        goTestReport.applyFilter(elements.data, selectedItems)
+      }
+    }
+  }
+
   return goTestReport
 }
