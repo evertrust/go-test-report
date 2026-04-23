@@ -7,11 +7,28 @@ LIN_DIR := release_builds/linux-amd64/
 MAC_DIR := release_builds/darwin-amd64/
 WIN_DIR := release_builds/windows-amd64/
 
+.PHONY: test test-go test-js genbuild gencode genreport buildall dockertest
+
+REPORT ?= test_report.html
+
 genbuild: gencode
 	go build
 
 gencode:
 	(cd embed_assets/;set -e;go build;./embed_assets)
+
+test: test-go test-js
+
+test-go:
+	go test ./...
+
+test-js:
+	@if [ ! -d node_modules ]; then npm install --no-audit --no-fund; fi
+	npm test
+
+genreport: genbuild
+	go test -json ./... | ./go-test-report -t "go-test-report tests" -o $(REPORT)
+	@echo "Report generated: $(REPORT)"
 
 buildall: genbuild
 	echo "Building..."

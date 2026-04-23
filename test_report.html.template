@@ -254,12 +254,62 @@
             box-shadow: 0 0 0 2px rgba(130, 152, 175, 0.2);
         }
 
+        .searchContainer .filterRow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
         .searchContainer .searchMeta {
-            display: block;
-            margin-top: 6px;
             font-size: 0.8em;
             color: #9e9e9e;
             min-height: 1em;
+        }
+
+        .statusFilter {
+            display: inline-flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .statusChip {
+            font: inherit;
+            font-size: 0.8em;
+            padding: 5px 12px;
+            border: 1px solid #d0d0d0;
+            border-radius: 999px;
+            background: white;
+            color: #525252;
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+        }
+
+        .statusChip:hover {
+            border-color: #8298af;
+        }
+
+        .statusChip.active {
+            color: white;
+            border-color: transparent;
+        }
+
+        .statusChip.all.active {
+            background: #8298af;
+        }
+
+        .statusChip.passed.active {
+            background: #6fca83;
+        }
+
+        .statusChip.skipped.active {
+            background: #bababa;
+        }
+
+        .statusChip.failed.active {
+            background: #ff7676;
         }
 
         .cardContainer.testGroupList .testGroupRow.noResults {
@@ -286,8 +336,17 @@
 </div>
 <div class="testReportContainer">
     <div class="searchContainer">
-        <input type="search" id="testSearch" placeholder="Search tests by name or package..." autocomplete="off" />
-        <span class="searchMeta" id="testSearchMeta"></span>
+        <input type="search" id="testSearch" placeholder="Search tests by name or package..." autocomplete="off" list="testSuggestions" />
+        <datalist id="testSuggestions"></datalist>
+        <div class="filterRow">
+            <div class="statusFilter" id="statusFilter">
+                <button type="button" class="statusChip all active" data-status="all">All</button>
+                <button type="button" class="statusChip passed" data-status="passed">Passed</button>
+                <button type="button" class="statusChip skipped" data-status="skipped">Skipped</button>
+                <button type="button" class="statusChip failed" data-status="failed">Failed</button>
+            </div>
+            <span class="searchMeta" id="testSearchMeta"></span>
+        </div>
     </div>
     <div class="cardContainer">
         <div id="testResults">
@@ -311,7 +370,9 @@
                                          testResultsElem: document.getElementById('testResults'),
                                          testGroupListElem: document.getElementById('testGroupList'),
                                          searchInputElem: document.getElementById('testSearch'),
-                                         searchMetaElem: document.getElementById('testSearchMeta')
+                                         searchMetaElem: document.getElementById('testSearchMeta'),
+                                         statusFilterElem: document.getElementById('statusFilter'),
+                                         suggestionsElem: document.getElementById('testSuggestions')
                                        });
 
 
